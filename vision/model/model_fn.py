@@ -9,17 +9,17 @@ def comCNN(inputs, params, num_channels, num_filters):
     '''
     out = inputs
     with tf.variable_scope('ComCNN_block_1'):
-        out = tf.layers.conv2d(input=out, filter=[3, 3, num_channels, num_filters], strides=1, padding='same')
+        out = tf.layers.conv2d(inputs=out, filters=num_filters, kernel_size=3, strides=1, padding='same') # TODO: possibly add regularization
         out = tf.nn.relu(out)
     with tf.variable_scope('ComCNN_block_2'):
-        out = tf.layers.conv2d(out, [3, 3, num_filters, num_filters], 2, padding='same')
+        out = tf.layers.conv2d(out, num_filters, 3, 2, padding='same')
         out = tf.nn.relu(out)
     with tf.variable_scope('ComCNN_output_block'): # for generating compact representation of image
-        out = tf.layers.conv2d(out, [3, 3, num_filters, num_channels], 1, padding='same')
+        out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
 
     return out
 
-def recCNN(inputs, params, num_channels, num_filters):
+def recCNN(inputs, params, num_channels, num_filters, is_training):
     '''
     Builds the RecCNN
     '''
@@ -28,17 +28,17 @@ def recCNN(inputs, params, num_channels, num_filters):
     bn_momentum = params.bn_momentum
     up_size = params.image_size
     num_intermediate = 18
-    out = tf.image.resize_images(out, up_size, method=ResizeMethod.BICUBIC) # Paper uses bicubic interpolation
+    out = tf.image.resize_images(out, (up_size, up_size), method=tf.image.ResizeMethod.BICUBIC) # Paper uses bicubic interpolation
     with tf.variable_scope('RecCNN_block_1'):
-        out = tf.layers.conv2d(out, [3, 3, num_channels, num_filters], 1, padding='same')
+        out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same')
         out = tf.nn.relu(out)
     for i in range(num_intermediate):
         with tf.variable_scope('RecCNN_block_{}'.format(i+2)):
-            out = tf.layers.conv2d(out, [3, 3, num_filters, num_filters], 1, padding='same')
+            out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same', activation=None)
             out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
             out = tf.nn.relu(out)
     with tf.variable_scope('RecCNN_output_block'):
-        out = tf.layers.conv2d(out, [3, 3, num_filters, num_channels], 1, padding='same')
+        out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
 
     return out
 
@@ -70,7 +70,7 @@ def build_model(is_training, inputs, params):
     num_channels = params.num_channels
     num_filters = 64
     com = comCNN(images, params, num_channels, num_filters)
-    rec = recCNN(com, params, num_channels, num_filters)
+    rec = recCNN(com, params, num_channels, num_filters, is_training)
 
     return com, rec
 
@@ -99,8 +99,8 @@ def model_fn(mode, inputs, params, reuse=False):
     
 
     # Define loss for both networks
-    com_loss = .5 * tf.mean_squared_error(labels=labels, predictions=rec)
-    rec_loss = .5 * tf.mean_squared_error(labels=com-labels, predictions=rec)
+    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec)
+    rec_loss = .5 * tf.losses.mean_squared_error(labels=com-labels, predictions=rec)
 
 
     # Define training step that minimizes the loss with the Adam optimizer
