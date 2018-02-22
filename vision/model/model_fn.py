@@ -71,7 +71,6 @@ def build_model(is_training, inputs, params):
     num_filters = 64
     com = comCNN(images, params, num_channels, num_filters)
     rec = recCNN(com, params, num_channels, num_filters)
-    
 
     return com, rec
 
@@ -90,39 +89,42 @@ def model_fn(mode, inputs, params, reuse=False):
         model_spec: (dict) contains the graph operations or nodes needed for training / evaluation
     """
     is_training = (mode == 'train')
-    labels = inputs['labels']
-    labels = tf.cast(labels, tf.int64)
+    labels = inputs['images'] # we train based on similarity to original image
 
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
-        # Compute the output distribution of the model and the predictions
-        _, logits = build_model(is_training, inputs, params)
-        predictions = tf.argmax(logits, 1)
+        # Compute the output of the model
+        com, rec = build_model(is_training, inputs, params)
+    
 
-    # Define loss and accuracy
-    loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(labels, predictions), tf.float32))
+    # Define loss for both networks
+    com_loss = .5 * tf.mean_squared_error(labels=labels, predictions=rec)
+    rec_loss = .5 * tf.mean_squared_error(labels=com-labels, predictions=rec)
+
 
     # Define training step that minimizes the loss with the Adam optimizer
     if is_training:
         optimizer = tf.train.AdamOptimizer(params.learning_rate)
         global_step = tf.train.get_or_create_global_step()
-        if params.use_batch_norm:
-            # Add a dependency to update the moving mean and variance for batch normalization
-            with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
-                train_op = optimizer.minimize(loss, global_step=global_step)
-        else:
-            train_op = optimizer.minimize(loss, global_step=global_step)
+        # if params.use_batch_norm:
+        #     # Add a dependency to update the moving mean and variance for batch normalization
+        #     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+        #         train_op = optimizer.minimize(loss, global_step=global_step)
+        # else:
+        train_op1 = optimizer.minimize(com_loss, global_step=global_step)
+        train_op2 = optimizer.minimize(rec_loss, global_step=global_step)
 
 
     # -----------------------------------------------------------
     # METRICS AND SUMMARIES
-    # Metrics for evaluation using tf.metrics (average over whole dataset)
+    # Metrics for evaluation
+    # TODO: define metric for recCNN (MMSSIM)
     with tf.variable_scope("metrics"):
         metrics = {
-            'accuracy': tf.metrics.accuracy(labels=labels, predictions=tf.argmax(logits, 1)),
-            'loss': tf.metrics.mean(loss)
+            'com_loss': tf.metrics.mean(com_loss)
+            'rec_loss': tf.metrics.mean(rec_loss)
+            'MMSSIM': -1 # TODO
         }
 
     # Group the update ops for the tf.metrics
@@ -133,19 +135,20 @@ def model_fn(mode, inputs, params, reuse=False):
     metrics_init_op = tf.variables_initializer(metric_variables)
 
     # Summaries for training
-    tf.summary.scalar('loss', loss)
-    tf.summary.scalar('accuracy', accuracy)
+    tf.summary.scalar('com_loss', com_loss)
+    tf.summary.scalar('rec_loss', rec_loss)
+    tf.summary.scalar('MMSSIM', 0)
     tf.summary.image('train_image', inputs['images'])
 
     #TODO: if mode == 'eval': ?
     # Add incorrectly labeled images
-    mask = tf.not_equal(labels, predictions)
+    # mask = tf.not_equal(labels, predictions)
 
     # Add a different summary to know how they were misclassified
-    for label in range(0, params.num_labels):
-        mask_label = tf.logical_and(mask, tf.equal(predictions, label))
-        incorrect_image_label = tf.boolean_mask(inputs['images'], mask_label)
-        tf.summary.image('incorrectly_labeled_{}'.format(label), incorrect_image_label)
+    # for label in range(0, params.num_labels):
+    #     mask_label = tf.logical_and(mask, tf.equal(predictions, label))
+    #     incorrect_image_label = tf.boolean_mask(inputs['images'], mask_label)
+    #     tf.summary.image('incorrectly_labeled_{}'.format(label), incorrect_image_label)
 
     # -----------------------------------------------------------
     # MODEL SPECIFICATION
@@ -153,15 +156,17 @@ def model_fn(mode, inputs, params, reuse=False):
     # It contains nodes or operations in the graph that will be used for training and evaluation
     model_spec = inputs
     model_spec['variable_init_op'] = tf.global_variables_initializer()
-    model_spec["predictions"] = predictions
-    model_spec['loss'] = loss
-    model_spec['accuracy'] = accuracy
+    model_spec["codec"] = com
+    model_spec['loss_com'] = loss1
+    model_spec['loss_rec'] = loss2
+    model_spec['MMSSIM'] = 0 # TODO
     model_spec['metrics_init_op'] = metrics_init_op
     model_spec['metrics'] = metrics
     model_spec['update_metrics'] = update_metrics_op
     model_spec['summary_op'] = tf.summary.merge_all()
 
     if is_training:
-        model_spec['train_op'] = train_op
+        model_spec['com_train_op'] = train_op1
+        model_spec['rec_train_op'] = train_op2
 
     return model_spec
