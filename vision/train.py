@@ -52,23 +52,22 @@ if __name__ == '__main__':
     # Get the filenames from the train and dev sets
     train_filenames = [os.path.join(train_data_dir, f) for f in os.listdir(train_data_dir)
                        if f.endswith('.png')]
-    # eval_filenames = [os.path.join(dev_data_dir, f) for f in os.listdir(dev_data_dir)
-    #                   if f.endswith('.png')]
+    eval_filenames = train_filenames
 
     # Labels will be between 0 and 5 included (6 classes in total)
 
     # Specify the sizes of the dataset we train on and evaluate on
     params.train_size = len(train_filenames)
-    # params.eval_size = len(eval_filenames)
+    params.eval_size = len(eval_filenames)
 
     # Create the two iterators over the two datasets
     train_inputs = input_fn(True, train_filenames, train_labels, params)
-    # eval_inputs = input_fn(False, eval_filenames, eval_labels, params)
+    eval_inputs = input_fn(False, eval_filenames, eval_labels, params)
 
     # Define the model
     logging.info("Creating the model...")
     train_model_spec = model_fn('train', train_inputs, params)
-    # eval_model_spec = model_fn('eval', eval_inputs, params, reuse=True)
+    eval_model_spec = model_fn('eval', eval_inputs, params, reuse=True)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
