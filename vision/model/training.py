@@ -21,8 +21,8 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         params: (Params) hyperparameters
     """
     # Get relevant graph operations or nodes needed for training
-    loss_com = model_spec['loss_com']
-    loss_rec = model_spec['loss_rec']
+    com_loss = model_spec['com_loss']
+    rec_loss = model_spec['rec_loss']
     com_train_op = model_spec['com_train_op']
     rec_train_op = model_spec['rec_train_op']
     update_metrics = model_spec['update_metrics']
@@ -40,17 +40,18 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            _, _, loss_val_com, summ, global_step_val = sess.run([com_train_op, update_metrics, loss_com,
+            _, _, com_loss_val, summ, global_step_val = sess.run([com_train_op, update_metrics, com_loss,
                                                               summary_op, global_step])
-            _, _, loss_val_rec, summ, global_step_val = sess.run([rec_train_op, update_metrics, loss_rec,
+            _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
                                                               summary_op, global_step])
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
         else:
-            _, _, loss_val_com = sess.run([com_train_op, update_metrics, loss_com])
-            _, _, loss_val_rec = sess.run([rec_train_op, update_metrics, loss_rec])
+            _, _, com_loss_val = sess.run([com_train_op, update_metrics, com_loss])
+            _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
         # Log the loss in the tqdm progress bar
-        t.set_postfix(loss='{:05.3f}'.format(loss_val))
+        t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
+        t.set_postfix(loss='{:05.3f}'.format(rec_loss_val))
 
 
     metrics_values = {k: v[0] for k, v in metrics.items()}
