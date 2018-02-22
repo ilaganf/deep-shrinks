@@ -122,8 +122,8 @@ def model_fn(mode, inputs, params, reuse=False):
     # TODO: define metric for recCNN (MMSSIM)
     with tf.variable_scope("metrics"):
         metrics = {
-            'com_loss': tf.metrics.mean(com_loss)
-            'rec_loss': tf.metrics.mean(rec_loss)
+            'com_loss': tf.metrics.mean(com_loss),
+            'rec_loss': tf.metrics.mean(rec_loss),
             'MMSSIM': -1 # TODO
         }
 

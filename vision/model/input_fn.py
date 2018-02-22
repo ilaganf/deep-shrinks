@@ -44,7 +44,7 @@ def train_preprocess(image, label, use_random_flip):
     return image, label
 
 
-def input_fn(is_training, filenames, labels, params):
+def input_fn(is_training, filenames, params):
     """Input function for the SIGNS dataset.
 
     The filenames have format "{label}_IMG_{id}.jpg".
