@@ -99,8 +99,10 @@ def model_fn(mode, inputs, params, reuse=False):
     
 
     # Define loss for both networks
+    upscaled_image = tf.image.resize_images(com, (params.image_size, params.image_size), \
+                                            method=tf.image.ResizeMethod.BICUBIC)
     com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec)
-    rec_loss = .5 * tf.losses.mean_squared_error(labels=com-labels, predictions=rec)
+    rec_loss = .5 * tf.losses.mean_squared_error(labels=upscaled_image-labels, predictions=rec)
 
 
     # Define training step that minimizes the loss with the Adam optimizer
@@ -123,8 +125,8 @@ def model_fn(mode, inputs, params, reuse=False):
     with tf.variable_scope("metrics"):
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
-            'rec_loss': tf.metrics.mean(rec_loss),
-            'MMSSIM': -1 # TODO
+            'rec_loss': tf.metrics.mean(rec_loss)
+            #'MMSSIM': -1 # TODO
         }
 
     # Group the update ops for the tf.metrics
@@ -137,7 +139,7 @@ def model_fn(mode, inputs, params, reuse=False):
     # Summaries for training
     tf.summary.scalar('com_loss', com_loss)
     tf.summary.scalar('rec_loss', rec_loss)
-    tf.summary.scalar('MMSSIM', 0)
+    # tf.summary.scalar('MMSSIM', 0)
     tf.summary.image('train_image', inputs['images'])
 
     #TODO: if mode == 'eval': ?
@@ -157,9 +159,9 @@ def model_fn(mode, inputs, params, reuse=False):
     model_spec = inputs
     model_spec['variable_init_op'] = tf.global_variables_initializer()
     model_spec["codec"] = com
-    model_spec['loss_com'] = loss1
-    model_spec['loss_rec'] = loss2
-    model_spec['MMSSIM'] = 0 # TODO
+    model_spec['com_loss'] = com_loss
+    model_spec['rec_loss'] = rec_loss
+    # model_spec['MMSSIM'] = 0 # TODO
     model_spec['metrics_init_op'] = metrics_init_op
     model_spec['metrics'] = metrics
     model_spec['update_metrics'] = update_metrics_op
