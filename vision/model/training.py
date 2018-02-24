@@ -40,19 +40,18 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            _, _, com_loss_val, summ, global_step_val = sess.run([com_train_op, update_metrics, com_loss,
-                                                              summary_op, global_step])
-            _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
-                                                              summary_op, global_step])
+            _, _, com_loss_val, summ, global_step_val,_,_ = sess.run([com_train_op, update_metrics, com_loss,
+                                                              summary_op, global_step, rec_train_op, rec_loss])
+            # _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
+            #                                                   summary_op, global_step])
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
         else:
             _, _, com_loss_val = sess.run([com_train_op, update_metrics, com_loss])
-            _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
+            # _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
         # Log the loss in the tqdm progress bar
         t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
-        t.set_postfix(loss='{:05.3f}'.format(rec_loss_val))
-
+        # t.set_postfix(loss='{:05.3f}'.format(rec_loss_val))
 
     metrics_values = {k: v[0] for k, v in metrics.items()}
     metrics_val = sess.run(metrics_values)
@@ -103,11 +102,9 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, res
             # Save weights
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
             last_saver.save(sess, last_save_path, global_step=epoch + 1)
-
             # Evaluate for one epoch on validation set
             num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
             metrics = evaluate_sess(sess, eval_model_spec, num_steps, eval_writer)
-
             # If best_eval, best_save_path
             eval_acc = metrics['accuracy']
             if eval_acc >= best_eval_acc:

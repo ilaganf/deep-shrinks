@@ -96,7 +96,7 @@ def model_fn(mode, inputs, params, reuse=False):
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output of the model
         com, rec = build_model(is_training, inputs, params)
-    
+
 
     # Define loss for both networks
     upscaled_image = tf.image.resize_images(com, (params.image_size, params.image_size), \
@@ -125,8 +125,8 @@ def model_fn(mode, inputs, params, reuse=False):
     with tf.variable_scope("metrics"):
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
-            'rec_loss': tf.metrics.mean(rec_loss)
-            #'MMSSIM': -1 # TODO
+            'rec_loss': tf.metrics.mean(rec_loss),
+            'accuracy': tf.metrics.accuracy(labels = labels, predictions = rec)
         }
 
     # Group the update ops for the tf.metrics
