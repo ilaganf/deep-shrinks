@@ -2,12 +2,13 @@
 
 import logging
 import os
-
+from scipy import misc
 from tqdm import trange
 import tensorflow as tf
-
+import numpy as np
 from model.utils import save_dict_to_json
 from model.evaluation import evaluate_sess
+import matplotlib.pyplot as plt
 
 
 def train_sess(sess, model_spec, num_steps, writer, params):
@@ -28,8 +29,9 @@ def train_sess(sess, model_spec, num_steps, writer, params):
     update_metrics = model_spec['update_metrics']
     metrics = model_spec['metrics']
     summary_op = model_spec['summary_op']
+    com = model_spec['codec']
     global_step = tf.train.get_global_step()
-
+    labels = model_spec['input']
     # Load the training dataset into the pipeline and initialize the metrics local variables
     sess.run(model_spec['iterator_init_op'])
     sess.run(model_spec['metrics_init_op'])
@@ -40,17 +42,21 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            _, _, com_loss_val, summ, global_step_val,_,_ = sess.run([com_train_op, update_metrics, com_loss,
-                                                              summary_op, global_step, rec_train_op, rec_loss])
+            _, _, com_loss_val, summ, global_step_val,_,_,compress,img = sess.run([com_train_op, update_metrics, com_loss,
+                                                              summary_op, global_step, rec_train_op, rec_loss,com, labels])
             # _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
             #                                                   summary_op, global_step])
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
+            plt.imshow(np.squeeze(img))
+            plt.show()
+            plt.imshow(np.squeeze(compress))
+            plt.show()
         else:
-            _, _, com_loss_val = sess.run([com_train_op, update_metrics, com_loss])
+            _, _, com_loss_val,_,_ = sess.run([com_train_op, rec_train_op, rec_loss, update_metrics, com_loss])
             # _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
         # Log the loss in the tqdm progress bar
-        t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
+        # t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
         # t.set_postfix(loss='{:05.3f}'.format(rec_loss_val))
 
     metrics_values = {k: v[0] for k, v in metrics.items()}

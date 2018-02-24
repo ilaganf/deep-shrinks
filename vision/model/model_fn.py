@@ -1,7 +1,7 @@
 """Define the model."""
 
 import tensorflow as tf
-
+import numpy as np
 
 def comCNN(inputs, params, num_channels, num_filters):
     '''
@@ -16,7 +16,7 @@ def comCNN(inputs, params, num_channels, num_filters):
         out = tf.nn.relu(out)
     with tf.variable_scope('ComCNN_output_block'): # for generating compact representation of image
         out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
-
+        out = tf.nn.relu(out)
     return out
 
 def recCNN(inputs, params, num_channels, num_filters, is_training):
@@ -35,7 +35,7 @@ def recCNN(inputs, params, num_channels, num_filters, is_training):
     for i in range(num_intermediate):
         with tf.variable_scope('RecCNN_block_{}'.format(i+2)):
             out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same', activation=None)
-            out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
+            # out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
             out = tf.nn.relu(out)
     with tf.variable_scope('RecCNN_output_block'):
         out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
@@ -90,20 +90,17 @@ def model_fn(mode, inputs, params, reuse=False):
     """
     is_training = (mode == 'train')
     labels = inputs['images'] # we train based on similarity to original image
-
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output of the model
         com, rec = build_model(is_training, inputs, params)
 
-
     # Define loss for both networks
-    upscaled_image = tf.image.resize_images(com, (params.image_size, params.image_size), \
+    upscaled_image = tf.image.resize_images(image_decoded, (params.image_size, params.image_size), \
                                             method=tf.image.ResizeMethod.BICUBIC)
-    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec)
+    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec+labels)
     rec_loss = .5 * tf.losses.mean_squared_error(labels=upscaled_image-labels, predictions=rec)
-
 
     # Define training step that minimizes the loss with the Adam optimizer
     if is_training:
@@ -166,7 +163,7 @@ def model_fn(mode, inputs, params, reuse=False):
     model_spec['metrics'] = metrics
     model_spec['update_metrics'] = update_metrics_op
     model_spec['summary_op'] = tf.summary.merge_all()
-
+    model_spec['input'] = labels
     if is_training:
         model_spec['com_train_op'] = train_op1
         model_spec['rec_train_op'] = train_op2
