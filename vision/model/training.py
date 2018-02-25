@@ -2,12 +2,13 @@
 
 import logging
 import os
-
+from scipy import misc
 from tqdm import trange
 import tensorflow as tf
-
+import numpy as np
 from model.utils import save_dict_to_json
 from model.evaluation import evaluate_sess
+import matplotlib.pyplot as plt
 
 
 def train_sess(sess, model_spec, num_steps, writer, params):
@@ -28,31 +29,40 @@ def train_sess(sess, model_spec, num_steps, writer, params):
     update_metrics = model_spec['update_metrics']
     metrics = model_spec['metrics']
     summary_op = model_spec['summary_op']
+    com = model_spec['codec']
+    final_output = model_spec['final_output']
     global_step = tf.train.get_global_step()
-
+    labels = model_spec['input']
     # Load the training dataset into the pipeline and initialize the metrics local variables
     sess.run(model_spec['iterator_init_op'])
     sess.run(model_spec['metrics_init_op'])
 
+
+
+    #Create optimizers for Com/Rec CNNs
+
     # Use tqdm for progress bar
     t = trange(num_steps)
+    counter = 0
     for i in t:
+        counter += 1
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            _, _, com_loss_val, summ, global_step_val = sess.run([com_train_op, update_metrics, com_loss,
-                                                              summary_op, global_step])
-            _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
-                                                              summary_op, global_step])
+            _, _, com_loss_val, summ, global_step_val,_,_,compress, final_output = sess.run([com_train_op, update_metrics, com_loss,
+                                                              summary_op, global_step, rec_train_op, rec_loss, com, final_output ])
+            # _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
+            #                                                   summary_op, global_step])
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
+            plt.imshow(np.squeeze(compress))
+            plt.show()
         else:
-            _, _, com_loss_val = sess.run([com_train_op, update_metrics, com_loss])
-            _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
+            _, _, com_loss_val,_,_ = sess.run([com_train_op, rec_train_op, rec_loss, update_metrics, com_loss])
+            # _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
         # Log the loss in the tqdm progress bar
-        t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
-        t.set_postfix(loss='{:05.3f}'.format(rec_loss_val))
-
+        # t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
+        # t.set_postfix(loss='{:05.3f}'.format(rec_loss_val))
 
     metrics_values = {k: v[0] for k, v in metrics.items()}
     metrics_val = sess.run(metrics_values)
@@ -103,11 +113,9 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, res
             # Save weights
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
             last_saver.save(sess, last_save_path, global_step=epoch + 1)
-
             # Evaluate for one epoch on validation set
             num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
             metrics = evaluate_sess(sess, eval_model_spec, num_steps, eval_writer)
-
             # If best_eval, best_save_path
             eval_acc = metrics['accuracy']
             if eval_acc >= best_eval_acc:

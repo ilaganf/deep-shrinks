@@ -1,8 +1,10 @@
 """Train the model"""
-
+import matplotlib
+matplotlib.use('TkAgg')
 import argparse
 import logging
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # ERROR
 import random
 
 import tensorflow as tf
