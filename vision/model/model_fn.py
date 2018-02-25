@@ -8,15 +8,16 @@ def comCNN(inputs, params, num_channels, num_filters):
     Builds the ComCNN
     '''
     out = inputs
-    with tf.variable_scope('ComCNN_block_1'):
-        out = tf.layers.conv2d(inputs=out, filters=num_filters, kernel_size=3, strides=1, padding='same') # TODO: possibly add regularization
-        out = tf.nn.relu(out)
-    with tf.variable_scope('ComCNN_block_2'):
-        out = tf.layers.conv2d(out, num_filters, 3, 2, padding='same')
-        out = tf.nn.relu(out)
-    with tf.variable_scope('ComCNN_output_block'): # for generating compact representation of image
-        out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
-        out = tf.nn.relu(out)
+    with tf.variable_scope('ComCNN_vars'):
+        with tf.variable_scope('ComCNN_block_1'):
+            out = tf.layers.conv2d(inputs=out, filters=num_filters, kernel_size=3, strides=1, padding='same') # TODO: possibly add regularization
+            out = tf.nn.relu(out)
+        with tf.variable_scope('ComCNN_block_2'):
+            out = tf.layers.conv2d(out, num_filters, 3, 2, padding='same')
+            out = tf.nn.relu(out)
+        with tf.variable_scope('ComCNN_output_block'): # for generating compact representation of image
+            out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
+
     return out
 
 def recCNN(inputs, params, num_channels, num_filters, is_training):
@@ -24,21 +25,22 @@ def recCNN(inputs, params, num_channels, num_filters, is_training):
     Builds the RecCNN
     '''
     out = inputs
+    with tf.variable_scope('RecCNN_vars'):
     # RecCNN
-    bn_momentum = params.bn_momentum
-    up_size = params.image_size
-    num_intermediate = 18
-    out = tf.image.resize_images(out, (up_size, up_size), method=tf.image.ResizeMethod.BICUBIC) # Paper uses bicubic interpolation
-    with tf.variable_scope('RecCNN_block_1'):
-        out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same')
-        out = tf.nn.relu(out)
-    for i in range(num_intermediate):
-        with tf.variable_scope('RecCNN_block_{}'.format(i+2)):
-            out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same', activation=None)
-            # out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
+        bn_momentum = params.bn_momentum
+        up_size = params.image_size
+        num_intermediate = 18
+        out = tf.image.resize_images(out, (up_size, up_size), method=tf.image.ResizeMethod.BICUBIC) # Paper uses bicubic interpolation
+        with tf.variable_scope('RecCNN_block_1'):
+            out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same')
             out = tf.nn.relu(out)
-    with tf.variable_scope('RecCNN_output_block'):
-        out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
+        for i in range(num_intermediate):
+            with tf.variable_scope('RecCNN_block_{}'.format(i+2)):
+                out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same', activation=None)
+                # out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
+                out = tf.nn.relu(out)
+        with tf.variable_scope('RecCNN_output_block'):
+            out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
 
     return out
 
@@ -70,9 +72,12 @@ def build_model(is_training, inputs, params):
     num_channels = params.num_channels
     num_filters = 64
     com = comCNN(images, params, num_channels, num_filters)
-    rec = recCNN(com, params, num_channels, num_filters, is_training)
+    up = tf.image.resize_images(com, (params.image_size, params.image_size), \
+                                            method=tf.image.ResizeMethod.BICUBIC)
 
-    return com, rec
+    rec = recCNN(up, params, num_channels, num_filters, is_training)
+
+    return com, up, rec
 
 
 def model_fn(mode, inputs, params, reuse=False):
@@ -94,13 +99,11 @@ def model_fn(mode, inputs, params, reuse=False):
     # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output of the model
-        com, rec = build_model(is_training, inputs, params)
+        com, up, rec = build_model(is_training, inputs, params)
 
     # Define loss for both networks
-    upscaled_image = tf.image.resize_images(image_decoded, (params.image_size, params.image_size), \
-                                            method=tf.image.ResizeMethod.BICUBIC)
-    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec+labels)
-    rec_loss = .5 * tf.losses.mean_squared_error(labels=upscaled_image-labels, predictions=rec)
+    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec+up)
+    rec_loss = .5 * tf.losses.mean_squared_error(labels=up-labels, predictions=rec)
 
     # Define training step that minimizes the loss with the Adam optimizer
     if is_training:
@@ -111,8 +114,8 @@ def model_fn(mode, inputs, params, reuse=False):
         #     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         #         train_op = optimizer.minimize(loss, global_step=global_step)
         # else:
-        train_op1 = optimizer.minimize(com_loss, global_step=global_step)
-        train_op2 = optimizer.minimize(rec_loss, global_step=global_step)
+        train_op1 = optimizer.minimize(com_loss, global_step=global_step, var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model/ComCNN_vars'))
+        train_op2 = optimizer.minimize(rec_loss, global_step=global_step, var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model/RecCNN_vars'))
 
 
     # -----------------------------------------------------------
@@ -155,17 +158,18 @@ def model_fn(mode, inputs, params, reuse=False):
     # It contains nodes or operations in the graph that will be used for training and evaluation
     model_spec = inputs
     model_spec['variable_init_op'] = tf.global_variables_initializer()
-    model_spec["codec"] = com
+    model_spec["codec"] = tf.sigmoid(com)
+    model_spec["final_output"] = tf.sigmoid(rec)
     model_spec['com_loss'] = com_loss
     model_spec['rec_loss'] = rec_loss
+    if is_training:
+        model_spec['com_train_op'] = train_op1
+        model_spec['rec_train_op'] = train_op2
     # model_spec['MMSSIM'] = 0 # TODO
     model_spec['metrics_init_op'] = metrics_init_op
     model_spec['metrics'] = metrics
     model_spec['update_metrics'] = update_metrics_op
     model_spec['summary_op'] = tf.summary.merge_all()
     model_spec['input'] = labels
-    if is_training:
-        model_spec['com_train_op'] = train_op1
-        model_spec['rec_train_op'] = train_op2
 
     return model_spec

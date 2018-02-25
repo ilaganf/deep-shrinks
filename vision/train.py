@@ -1,5 +1,6 @@
 """Train the model"""
-
+import matplotlib
+matplotlib.use('TkAgg')
 import argparse
 import logging
 import os
