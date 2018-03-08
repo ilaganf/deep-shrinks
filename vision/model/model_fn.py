@@ -48,6 +48,13 @@ def recCNN(inputs, params, num_channels, num_filters, is_training):
 
     return out
 
+def get_rec_input(compact, params):
+    compact = tf.image.convert_image_dtype(compact, tf.uint8, saturate=True)
+    tf.map_fn(lambda x: tf.image.encode_jpeg(x), compact)
+    up = tf.image.resize_images(compact, (params.image_size, params.image_size),
+                                method=tf.image.ResizeMethod.BICUBIC)
+    rec_input = tf.cast(up, tf.float32)
+    return rec_input
 
 def build_model(is_training, inputs, params):
     """
@@ -69,20 +76,7 @@ def build_model(is_training, inputs, params):
     RecCNN (Re): 20 layers -   CONV->ReLU       -> CONV->BatchNorm->ReLU (x18)   ->       CONV
                               (64 3x3xc filters)      (64 3x3x64 filters)           (c 3x3x64 filters)
     """
-    images = inputs['images']
-
-    assert images.get_shape().as_list() == [None, params.image_size, params.image_size, 3]
-
-    num_channels = params.num_channels
-    num_filters = 64
-    com = comCNN(images, params, num_channels, num_filters)
-    up = tf.image.resize_images(com, (params.image_size, params.image_size),
-                                method=tf.image.ResizeMethod.BICUBIC)
-
-    rec = recCNN(up, params, num_channels, num_filters, is_training)
-
-    return com, up, rec
-
+    pass
 
 def model_fn(mode, inputs, params, reuse=False):
     """Model function defining the graph operations.
@@ -101,13 +95,24 @@ def model_fn(mode, inputs, params, reuse=False):
     labels = inputs['images'] # we train based on similarity to original image
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
+    num_channels = params.num_channels
+    num_filters = 64
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output of the model
-        com, up, rec = build_model(is_training, inputs, params)
+        com = comCNN(labels, params, num_channels, num_filters)
+        compress = get_rec_input(com, params)
+        x_hat = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels],
+                               name="x_hat")
+        rec = recCNN(x_hat, params, num_channels, num_filters, is_training)
+        rec_output = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels],
+                                    name="rec_output")
+        com_temp = tf.image.resize_images(com, (params.image_size, params.image_size),
+                                          method=tf.image.ResizeMethod.BICUBIC)
 
     # Define loss for both networks
-    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec+up)
-    rec_loss = .5 * tf.losses.mean_squared_error(labels=up-labels, predictions=rec)
+    # com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec_output+x_hat)
+    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=com_temp)
+    rec_loss = .5 * tf.losses.mean_squared_error(labels=x_hat-labels, predictions=rec)
 
     # Define training step that minimizes the loss with the Adam optimizer
     if is_training:
@@ -166,6 +171,8 @@ def model_fn(mode, inputs, params, reuse=False):
     # It contains nodes or operations in the graph that will be used for training and evaluation
     model_spec = inputs
     model_spec['variable_init_op'] = tf.global_variables_initializer()
+    model_spec['compression_op'] = compress
+    model_spec['reconstructed'] = rec
     model_spec["codec"] = tf.sigmoid(com)
     model_spec["final_output"] = tf.sigmoid(rec)
     model_spec['com_loss'] = com_loss
@@ -179,5 +186,7 @@ def model_fn(mode, inputs, params, reuse=False):
     model_spec['update_metrics'] = update_metrics_op
     model_spec['summary_op'] = tf.summary.merge_all()
     model_spec['input'] = labels
+    model_spec['x_hat_placeholder'] = x_hat
+    model_spec['rec_placeholder'] = rec_output
 
     return model_spec

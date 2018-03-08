@@ -22,6 +22,7 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         params: (Params) hyperparameters
     """
     # Get relevant graph operations or nodes needed for training
+    compress = model_spec['compression_op']
     com_loss = model_spec['com_loss']
     rec_loss = model_spec['rec_loss']
     com_train_op = model_spec['com_train_op']
@@ -31,8 +32,11 @@ def train_sess(sess, model_spec, num_steps, writer, params):
     summary_op = model_spec['summary_op']
     com = model_spec['codec']
     final_output = model_spec['final_output']
+    rec = model_spec['reconstructed']
     global_step = tf.train.get_global_step()
     labels = model_spec['input']
+    x_hat_feed = model_spec['x_hat_placeholder']
+    rec_output = model_spec['rec_placeholder']
     # Load the training dataset into the pipeline and initialize the metrics local variables
     sess.run(model_spec['iterator_init_op'])
     sess.run(model_spec['metrics_init_op'])
@@ -49,16 +53,23 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            _, _, com_loss_val, summ, global_step_val,_,_,compress, final_output = sess.run([com_train_op, update_metrics, com_loss,
-                                                              summary_op, global_step, rec_train_op, rec_loss, com, final_output ])
+            x_hat, summ, global_step_val = sess.run([compress, summary_op, global_step])
+            print(x_hat)
+            _, _, rec_output = sess.run([rec_train_op, rec_loss, rec], feed_dict={x_hat_feed:x_hat})
+            _, _, com_output = sess.run([com_train_op, com_loss, com])
+
+
+            ops = [com_train_op, update_metrics, com_loss, summary_op, 
+                   global_step, rec_train_op, rec_loss, com, final_output ]
+            _, _, com_loss_val, summ, global_step_val,_,_,compress, final_output = sess.run(ops)
             # _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
             #                                                   summary_op, global_step])
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
-            plt.imshow(np.squeeze(compress))
+            plt.imshow(np.squeeze(x_hat))
             plt.show()
         else:
-            _, _, com_loss_val,_,_ = sess.run([com_train_op, rec_train_op, rec_loss, update_metrics, com_loss])
+            _, _, _ = sess.run([com_train_op, rec_train_op, update_metrics])
             # _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
         # Log the loss in the tqdm progress bar
         # t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
