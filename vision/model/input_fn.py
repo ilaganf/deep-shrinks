@@ -45,15 +45,15 @@ def train_preprocess(image, label, use_random_flip):
 
 
 def input_fn(is_training, filenames, params):
-    """Input function for the SIGNS dataset.
+    """Input function for the dataset.
 
-    The filenames have format "{label}_IMG_{id}.jpg".
-    For instance: "data_dir/2_IMG_4584.jpg".
+    The filenames have format "author-name-idnumber.png".
+    For instance: "data_dir/john-price-5258.png".
 
     Args:
         is_training: (bool) whether to use the train or test pipeline.
                      At training, we shuffle the data and have multiple epochs
-        filenames: (list) filenames of the images, as ["data_dir/{label}_IMG_{id}.jpg"...]
+        filenames: (list) filenames of the images, as ["data_dir/author-name-{id}.png"...]
         labels: (list) corresponding list of labels
         params: (Params) contains hyperparameters of the model (ex: `params.num_epochs`)
     """
