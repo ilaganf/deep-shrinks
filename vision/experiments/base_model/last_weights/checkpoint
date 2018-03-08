@@ -1,2 +1,6 @@
-model_checkpoint_path: "after-epoch-1"
-all_model_checkpoint_paths: "after-epoch-1"
+model_checkpoint_path: "after-epoch-7"
+all_model_checkpoint_paths: "after-epoch-3"
+all_model_checkpoint_paths: "after-epoch-4"
+all_model_checkpoint_paths: "after-epoch-5"
+all_model_checkpoint_paths: "after-epoch-6"
+all_model_checkpoint_paths: "after-epoch-7"

@@ -55,7 +55,7 @@ def train_sess(sess, model_spec, num_steps, writer, params):
             #                                                   summary_op, global_step])
             # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
-            plt.imshow(np.squeeze(compress))
+            plt.imshow(np.squeeze(final_output))
             plt.show()
         else:
             _, _, com_loss_val,_,_ = sess.run([com_train_op, rec_train_op, rec_loss, update_metrics, com_loss])

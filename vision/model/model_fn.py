@@ -12,13 +12,13 @@ def comCNN(inputs, params, num_channels, num_filters):
     with tf.variable_scope('ComCNN_vars'):
         with tf.variable_scope('ComCNN_block_1'):
             # TODO: possibly add regularization
-            out = tf.layers.conv2d(inputs=out, filters=num_filters, 
+            out = tf.layers.conv2d(inputs=out, filters=num_filters,
                                    kernel_size=3, strides=1, padding='same')
             out = tf.nn.relu(out)
         with tf.variable_scope('ComCNN_block_2'):
             out = tf.layers.conv2d(out, num_filters, 3, 2, padding='same')
             out = tf.nn.relu(out)
-        with tf.variable_scope('ComCNN_output_block'): 
+        with tf.variable_scope('ComCNN_output_block'):
             # for generating compact representation of image
             out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
 
@@ -76,9 +76,11 @@ def build_model(is_training, inputs, params):
     num_channels = params.num_channels
     num_filters = 64
     com = comCNN(images, params, num_channels, num_filters)
+    com = tf.image.convert_image_dtype(com, tf.uint8)
+    codec = lambda x: tf.image.encode_jpeg(x)
+    tf.map_fn(codec, com)
     up = tf.image.resize_images(com, (params.image_size, params.image_size),
                                 method=tf.image.ResizeMethod.BICUBIC)
-
     rec = recCNN(up, params, num_channels, num_filters, is_training)
 
     return com, up, rec
@@ -107,7 +109,7 @@ def model_fn(mode, inputs, params, reuse=False):
 
     # Define loss for both networks
     com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec+up)
-    rec_loss = .5 * tf.losses.mean_squared_error(labels=up-labels, predictions=rec)
+    rec_loss = .5 * tf.losses.mean_squared_error(labels=labels-up, predictions=rec)
 
     # Define training step that minimizes the loss with the Adam optimizer
     if is_training:
@@ -118,11 +120,11 @@ def model_fn(mode, inputs, params, reuse=False):
         #     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         #         train_op = optimizer.minimize(loss, global_step=global_step)
         # else:
-        train_op1 = optimizer.minimize(com_loss, global_step=global_step, 
-                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 
+        train_op1 = optimizer.minimize(com_loss, global_step=global_step,
+                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                                                   scope='model/ComCNN_vars'))
-        train_op2 = optimizer.minimize(rec_loss, global_step=global_step, 
-                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 
+        train_op2 = optimizer.minimize(rec_loss, global_step=global_step,
+                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                                                   scope='model/RecCNN_vars'))
 
 
