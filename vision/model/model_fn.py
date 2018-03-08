@@ -4,29 +4,33 @@ import tensorflow as tf
 import numpy as np
 
 def comCNN(inputs, params, num_channels, num_filters):
-    '''
-    Builds the ComCNN
+    '''Builds the ComCNN
+
+        Defines the compressor convolutional neural network
     '''
     out = inputs
     with tf.variable_scope('ComCNN_vars'):
         with tf.variable_scope('ComCNN_block_1'):
-            out = tf.layers.conv2d(inputs=out, filters=num_filters, kernel_size=3, strides=1, padding='same') # TODO: possibly add regularization
+            # TODO: possibly add regularization
+            out = tf.layers.conv2d(inputs=out, filters=num_filters, 
+                                   kernel_size=3, strides=1, padding='same')
             out = tf.nn.relu(out)
         with tf.variable_scope('ComCNN_block_2'):
             out = tf.layers.conv2d(out, num_filters, 3, 2, padding='same')
             out = tf.nn.relu(out)
-        with tf.variable_scope('ComCNN_output_block'): # for generating compact representation of image
+        with tf.variable_scope('ComCNN_output_block'): 
+            # for generating compact representation of image
             out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
 
     return out
 
 def recCNN(inputs, params, num_channels, num_filters, is_training):
-    '''
-    Builds the RecCNN
+    '''Builds the RecCNN
+
+        Responsible for defining the reconstructor convolutional neural network
     '''
     out = inputs
     with tf.variable_scope('RecCNN_vars'):
-    # RecCNN
         bn_momentum = params.bn_momentum
         up_size = params.image_size
         num_intermediate = 18
@@ -72,8 +76,8 @@ def build_model(is_training, inputs, params):
     num_channels = params.num_channels
     num_filters = 64
     com = comCNN(images, params, num_channels, num_filters)
-    up = tf.image.resize_images(com, (params.image_size, params.image_size), \
-                                            method=tf.image.ResizeMethod.BICUBIC)
+    up = tf.image.resize_images(com, (params.image_size, params.image_size),
+                                method=tf.image.ResizeMethod.BICUBIC)
 
     rec = recCNN(up, params, num_channels, num_filters, is_training)
 
@@ -114,8 +118,12 @@ def model_fn(mode, inputs, params, reuse=False):
         #     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         #         train_op = optimizer.minimize(loss, global_step=global_step)
         # else:
-        train_op1 = optimizer.minimize(com_loss, global_step=global_step, var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model/ComCNN_vars'))
-        train_op2 = optimizer.minimize(rec_loss, global_step=global_step, var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='model/RecCNN_vars'))
+        train_op1 = optimizer.minimize(com_loss, global_step=global_step, 
+                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 
+                                                                  scope='model/ComCNN_vars'))
+        train_op2 = optimizer.minimize(rec_loss, global_step=global_step, 
+                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 
+                                                                  scope='model/RecCNN_vars'))
 
 
     # -----------------------------------------------------------
@@ -126,7 +134,7 @@ def model_fn(mode, inputs, params, reuse=False):
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
             'rec_loss': tf.metrics.mean(rec_loss),
-            'accuracy': tf.metrics.accuracy(labels = labels, predictions = rec)
+            'accuracy': tf.metrics.accuracy(labels=labels, predictions=rec)
         }
 
     # Group the update ops for the tf.metrics
@@ -139,7 +147,7 @@ def model_fn(mode, inputs, params, reuse=False):
     # Summaries for training
     tf.summary.scalar('com_loss', com_loss)
     tf.summary.scalar('rec_loss', rec_loss)
-    # tf.summary.scalar('MMSSIM', 0)
+    # tf.summary.scalar('MMSSIM', 0) TODO
     tf.summary.image('train_image', inputs['images'])
 
     #TODO: if mode == 'eval': ?
