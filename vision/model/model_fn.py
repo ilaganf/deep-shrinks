@@ -70,6 +70,7 @@ def get_rec_input(compact, params):
     '''
     compact = tf.image.convert_image_dtype(compact, tf.uint8, saturate=True)
     tf.map_fn(lambda x: tf.image.encode_jpeg(x), compact)
+    tf.map_fn(lambda x: tf.image.decode_jpeg(x), compact)
     up = tf.image.resize_images(compact, (params.image_size, params.image_size),
                                 method=tf.image.ResizeMethod.BICUBIC)
     rec_input = tf.cast(up, tf.float32)
@@ -108,8 +109,8 @@ def model_fn(mode, inputs, params, reuse=False):
                                           method=tf.image.ResizeMethod.BICUBIC)
 
     # Define loss for both networks
-    # com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec_output+x_hat)
-    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=com_temp)
+    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec_output+com_temp)
+    # com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=com_temp)
     rec_loss = .5 * tf.losses.mean_squared_error(labels=x_hat-labels, predictions=rec)
 
     # Define training step that minimizes the loss with the Adam optimizer
