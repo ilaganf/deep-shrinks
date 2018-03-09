@@ -55,9 +55,9 @@ def train_sess(sess, model_spec, num_steps, writer, params):
             # Perform a mini-batch update
             x_hat, global_step_val = sess.run([compress, global_step])
             print(x_hat.shape)
-            _, _, rec_output = sess.run([rec_train_op, rec_loss, rec], feed_dict={x_hat_feed:x_hat})
+            _, _, residual = sess.run([rec_train_op, rec_loss, rec], feed_dict={x_hat_feed:x_hat})
             print("got rec output")
-            _, _, com_output = sess.run([com_train_op, com_loss, com])
+            _, _, com_output = sess.run([com_train_op, com_loss, com], feed_dict={rec_output:residual})
 
 
             ops = [com_train_op, update_metrics, com_loss, summary_op, 
