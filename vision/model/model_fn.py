@@ -98,7 +98,7 @@ def model_fn(mode, inputs, params, reuse=False):
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output of the model
         com = comCNN(labels, params, num_channels, num_filters)
-        compress = get_rec_input(com, params)
+        compress = get_rec_input(com, params) # puts compact representation through codec and upsizes
         x_hat = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels],
                                name="x_hat")
         rec = recCNN(x_hat, params, num_channels, num_filters, is_training)

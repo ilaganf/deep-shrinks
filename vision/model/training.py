@@ -53,9 +53,10 @@ def train_sess(sess, model_spec, num_steps, writer, params):
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            x_hat, summ, global_step_val = sess.run([compress, summary_op, global_step])
-            print(x_hat)
+            x_hat, global_step_val = sess.run([compress, global_step])
+            print(x_hat.shape)
             _, _, rec_output = sess.run([rec_train_op, rec_loss, rec], feed_dict={x_hat_feed:x_hat})
+            print("got rec output")
             _, _, com_output = sess.run([com_train_op, com_loss, com])
 
 
