@@ -69,9 +69,10 @@ def get_rec_input(compact, params):
     then upscales to the pre-defined size using Bicubic interpolation
     '''
     compact = tf.image.convert_image_dtype(compact, tf.uint8, saturate=True)
-    tf.map_fn(lambda x: tf.image.encode_jpeg(x), compact)
-    tf.map_fn(lambda x: tf.image.decode_jpeg(x), compact)
-    up = tf.image.resize_images(compact, (params.image_size, params.image_size),
+    encode_decode = []
+    encoded = tf.map_fn(lambda x: tf.image.encode_jpeg(x), compact, dtype=tf.string)
+    decoded = tf.map_fn(lambda x: tf.image.decode_jpeg(x), encoded, dtype=tf.uint8)
+    up = tf.image.resize_images(decoded, (params.image_size, params.image_size),
                                 method=tf.image.ResizeMethod.BICUBIC)
     rec_input = tf.cast(up, tf.float32)
     return rec_input
