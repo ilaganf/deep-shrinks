@@ -3,6 +3,18 @@
 import tensorflow as tf
 import numpy as np
 
+'''
+ARCHITECTURE (Jiang et al.)
+c = number of channels (3 for RGB)
+ComCNN (Cr): 3 weight layers -    CONV -> ReLU       ->     CONV -> ReLU              ->     CONV
+                                (64 3x3xc filters)     (stride 2, 64 3x3x64 filters)  (c 3x3x64 filters)
+
+RecCNN (Re): 20 layers -    CONV->ReLU       -> CONV->BatchNorm->ReLU (x18)   ->       CONV
+                         (64 3x3xc filters)      (64 3x3x64 filters)           (c 3x3x64 filters)
+
+All convolutional layers use same padding
+'''
+
 def comCNN(inputs, params, num_channels, num_filters):
     '''Builds the ComCNN
 
@@ -24,10 +36,11 @@ def comCNN(inputs, params, num_channels, num_filters):
 
     return out
 
+
 def recCNN(inputs, params, num_channels, num_filters, is_training):
     '''Builds the RecCNN
 
-        Responsible for defining the reconstructor convolutional neural network
+    Responsible for defining the reconstructor convolutional neural network
     '''
     out = inputs
     with tf.variable_scope('RecCNN_vars'):
@@ -48,7 +61,13 @@ def recCNN(inputs, params, num_channels, num_filters, is_training):
 
     return out
 
+
 def get_rec_input(compact, params):
+    '''Creates the operation that calculates the input to the recCNN
+
+    Takes the compact representation from the comCNN, encodes it as jpeg,
+    then upscales to the pre-defined size using Bicubic interpolation
+    '''
     compact = tf.image.convert_image_dtype(compact, tf.uint8, saturate=True)
     tf.map_fn(lambda x: tf.image.encode_jpeg(x), compact)
     up = tf.image.resize_images(compact, (params.image_size, params.image_size),
@@ -56,27 +75,6 @@ def get_rec_input(compact, params):
     rec_input = tf.cast(up, tf.float32)
     return rec_input
 
-def build_model(is_training, inputs, params):
-    """
-
-    Args:
-        is_training: (bool) whether we are training or not
-        inputs: (dict) contains the inputs of the graph (features, labels...)
-                this can be `tf.placeholder` or outputs of `tf.data`
-        params: (Params) hyperparameters
-
-    Returns:
-        output: (tf.Tensor) output of the model
-
-    ARCHITECTURE (Jiang et al.)
-    c = number of channels (3 for RGB)
-    ComCNN (Cr): 3 weight layers -   CONV -> ReLU       ->     CONV -> ReLU              ->     CONV
-                                    (64 3x3xc filters)     (stride 2, 64 3x3x64 filters)  (c 3x3x64 filters)
-
-    RecCNN (Re): 20 layers -   CONV->ReLU       -> CONV->BatchNorm->ReLU (x18)   ->       CONV
-                              (64 3x3xc filters)      (64 3x3x64 filters)           (c 3x3x64 filters)
-    """
-    pass
 
 def model_fn(mode, inputs, params, reuse=False):
     """Model function defining the graph operations.
