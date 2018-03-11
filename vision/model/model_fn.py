@@ -92,11 +92,13 @@ def model_fn(mode, inputs, params, reuse=False):
         model_spec: (dict) contains the graph operations or nodes needed for training / evaluation
     """
     is_training = (mode == 'train')
-    labels = inputs['images'] # we train based on similarity to original image
-    # -----------------------------------------------------------
-    # MODEL: define the layers of the model
     num_channels = params.num_channels
     num_filters = 64
+    # labels = inputs['images'] # we train based on similarity to original image
+    labels = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels], 
+                            name='input_images')
+    # -----------------------------------------------------------
+    # MODEL: define the layers of the model
     with tf.variable_scope('model', reuse=reuse):
         # Compute the output of the model
         com = comCNN(labels, params, num_channels, num_filters)
@@ -106,11 +108,12 @@ def model_fn(mode, inputs, params, reuse=False):
         rec = recCNN(x_hat, params, num_channels, num_filters, is_training)
         rec_output = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels],
                                     name="rec_output")
-        com_temp = tf.image.resize_images(com, (params.image_size, params.image_size),
+        com_direct = tf.image.resize_images(com, (params.image_size, params.image_size),
                                           method=tf.image.ResizeMethod.BICUBIC)
-
+    
+    final_output = rec_output + com_direct
     # Define loss for both networks
-    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=rec_output+com_temp)
+    com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=final_output)
     # com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=com_temp)
     rec_loss = .5 * tf.losses.mean_squared_error(labels=x_hat-labels, predictions=rec)
 
@@ -139,7 +142,7 @@ def model_fn(mode, inputs, params, reuse=False):
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
             'rec_loss': tf.metrics.mean(rec_loss),
-            'accuracy': tf.metrics.accuracy(labels=labels, predictions=rec)
+            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=final_output)
         }
 
     # Group the update ops for the tf.metrics
@@ -153,7 +156,7 @@ def model_fn(mode, inputs, params, reuse=False):
     tf.summary.scalar('com_loss', com_loss)
     tf.summary.scalar('rec_loss', rec_loss)
     # tf.summary.scalar('MMSSIM', 0) TODO
-    tf.summary.image('train_image', inputs['images'])
+    tf.summary.image('train_image', labels)
 
     #TODO: if mode == 'eval': ?
     # Add incorrectly labeled images
@@ -169,7 +172,7 @@ def model_fn(mode, inputs, params, reuse=False):
     # MODEL SPECIFICATION
     # Create the model specification and return it
     # It contains nodes or operations in the graph that will be used for training and evaluation
-    model_spec = inputs
+    model_spec = {}
     model_spec['variable_init_op'] = tf.global_variables_initializer()
     model_spec['compression_op'] = compress
     model_spec['reconstructed'] = rec
@@ -180,7 +183,6 @@ def model_fn(mode, inputs, params, reuse=False):
     if is_training:
         model_spec['com_train_op'] = train_op1
         model_spec['rec_train_op'] = train_op2
-    # model_spec['MMSSIM'] = 0 # TODO
     model_spec['metrics_init_op'] = metrics_init_op
     model_spec['metrics'] = metrics
     model_spec['update_metrics'] = update_metrics_op

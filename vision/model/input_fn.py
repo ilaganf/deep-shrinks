@@ -3,7 +3,13 @@
 import tensorflow as tf
 
 
-
+def load_data(params, filenames):
+    parse_fn = lambda f: _parse_function(f, params.image_size)
+    images = tf.constant(filenames)
+    processed = tf.map_fn(parse_fn, images)
+    with tf.Session() as sess:
+        data = sess.run(processed)
+    return data
 
 def _parse_function(filename, size=180):
     """Obtain the image from the filename (for both training and validation).

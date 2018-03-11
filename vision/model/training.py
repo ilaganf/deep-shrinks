@@ -2,16 +2,18 @@
 
 import logging
 import os
+
 from scipy import misc
 from tqdm import trange
 import tensorflow as tf
 import numpy as np
+
 from model.utils import save_dict_to_json
 from model.evaluation import evaluate_sess
 import matplotlib.pyplot as plt
 
 
-def train_sess(sess, model_spec, num_steps, writer, params):
+def train_sess(data, sess, model_spec, num_steps, writer, params):
     """Train the model on `num_steps` batches
 
     Args:
@@ -47,25 +49,23 @@ def train_sess(sess, model_spec, num_steps, writer, params):
 
     # Use tqdm for progress bar
     t = trange(num_steps)
-    counter = 0
     for i in t:
-        counter += 1
+        # Get current minibatch
+        batch_start = i * params.batch_size
+        batch_end = (i+1) * params.batch_size
+        batch = data[batch_start:batch_end]
+
         # Evaluate summaries for tensorboard only once in a while
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
-            x_hat, global_step_val = sess.run([compress, global_step])
-            print(x_hat.shape)
-            _, _, residual = sess.run([rec_train_op, rec_loss, rec], feed_dict={x_hat_feed:x_hat})
-            print("got rec output")
-            _, _, com_output = sess.run([com_train_op, com_loss, com], feed_dict={rec_output:residual})
+            x_hat, global_step_val = sess.run([compress, global_step], feed_dict={labels:batch})
+            _, rec_loss_val, residuals = sess.run([rec_train_op, rec_loss, rec], 
+                                                  feed_dict={x_hat_feed:x_hat, labels:batch})
+            _, com_loss_val, com_output = sess.run([com_train_op, com_loss, com], 
+                                                   feed_dict={rec_output:residuals, labels:batch})
+            summ, _ = sess.run([summary_op, update_metrics],
+                               feed_dict={labels:batch, x_hat_feed:x_hat, rec_output:residuals})
 
-
-            ops = [com_train_op, update_metrics, com_loss, summary_op, 
-                   global_step, rec_train_op, rec_loss, com, final_output ]
-            _, _, com_loss_val, summ, global_step_val,_,_,compress, final_output = sess.run(ops)
-            # _, _, rec_loss_val, summ, global_step_val = sess.run([rec_train_op, update_metrics, rec_loss,
-            #                                                   summary_op, global_step])
-            # Write summaries for tensorboard
             writer.add_summary(summ, global_step_val)
             plt.imshow(np.squeeze(x_hat))
             plt.show()
@@ -82,7 +82,7 @@ def train_sess(sess, model_spec, num_steps, writer, params):
     logging.info("- Train metrics: " + metrics_string)
 
 
-def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, restore_from=None):
+def train_and_evaluate(data, train_model_spec, eval_model_spec, model_dir, params, restore_from=None):
     """Train the model and evaluate every epoch.
 
     Args:
@@ -120,7 +120,7 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, res
             logging.info("Epoch {}/{}".format(epoch + 1, begin_at_epoch + params.num_epochs))
             # Compute number of batches in one epoch (one full pass over the training set)
             num_steps = (params.train_size + params.batch_size - 1) // params.batch_size
-            train_sess(sess, train_model_spec, num_steps, train_writer, params)
+            train_sess(data, sess, train_model_spec, num_steps, train_writer, params)
 
             # Save weights
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
@@ -129,7 +129,7 @@ def train_and_evaluate(train_model_spec, eval_model_spec, model_dir, params, res
             num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
             metrics = evaluate_sess(sess, eval_model_spec, num_steps, eval_writer)
             # If best_eval, best_save_path
-            eval_acc = metrics['accuracy']
+            eval_acc = metrics['rmse']
             if eval_acc >= best_eval_acc:
                 # Store new best accuracy
                 best_eval_acc = eval_acc
