@@ -9,7 +9,7 @@ import tensorflow as tf
 from model.utils import save_dict_to_json
 
 
-def evaluate_sess(sess, model_spec, num_steps, writer=None, params=None):
+def evaluate_sess(data, sess, model_spec, num_steps, writer=None, params=None):
     """Train the model on `num_steps` batches.
 
     Args:
@@ -21,15 +21,30 @@ def evaluate_sess(sess, model_spec, num_steps, writer=None, params=None):
     """
     update_metrics = model_spec['update_metrics']
     eval_metrics = model_spec['metrics']
+    labels = model_spec['input']
+    x_hat = model_spec['x_hat_placeholder']
+    rec_output = model_spec['rec_placeholder']
+    rec = model_spec['reconstructed']
+    compress = model_spec['compression_op']
+
+
     global_step = tf.train.get_global_step()
 
     # Load the evaluation dataset into the pipeline and initialize the metrics init op
-    sess.run(model_spec['iterator_init_op'])
     sess.run(model_spec['metrics_init_op'])
 
     # compute metrics over the dataset
-    for _ in range(num_steps):
-        sess.run(update_metrics)
+    for i in range(num_steps):
+        if params is not None:
+            batch_start = i * params.batch_size
+            batch_end = batch_start + params.batch_size
+        else:
+            batch_start = i
+            batch_end = i + 1
+        batch = data[batch_start:batch_end]
+        x = sess.run(compress, feed_dict={labels:batch})
+        residuals = sess.run(rec, feed_dict={labels:batch, x_hat:x})
+        sess.run(update_metrics, feed_dict={labels:batch, x_hat:x, rec_output:residuals})
 
     # Get the values of the metrics
     metrics_values = {k: v[0] for k, v in eval_metrics.items()}

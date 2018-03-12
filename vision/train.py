@@ -9,7 +9,7 @@ import random
 
 import tensorflow as tf
 
-from model.input_fn import input_fn
+import model.input_fn
 from model.utils import Params
 from model.utils import set_logger
 from model.utils import save_dict_to_json
@@ -63,14 +63,19 @@ if __name__ == '__main__':
     params.eval_size = len(eval_filenames)
 
     # Create the two iterators over the two datasets
-    train_inputs = input_fn(True, train_filenames, params)
-    eval_inputs = input_fn(False, eval_filenames, params)
+    # train_inputs = input_fn(True, train_filenames, params)
+    # eval_inputs = input_fn(False, eval_filenames, params)
+
+    # Load image data
+    train_data = model.input_fn.load_data(params, train_filenames)
+    # eval_data = model.input_fn.load_data(params, eval_filenames)
+    eval_data = train_data
 
     # Define the model
     logging.info("Creating the model...")
-    train_model_spec = model_fn('train', train_inputs, params)
-    eval_model_spec = model_fn('eval', eval_inputs, params, reuse=True)
+    train_model_spec = model_fn('train', params)
+    eval_model_spec = model_fn('eval', params, reuse=True)
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(train_model_spec, eval_model_spec, args.model_dir, params, args.restore_from)
+    train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec, args.model_dir, params, args.restore_from)
