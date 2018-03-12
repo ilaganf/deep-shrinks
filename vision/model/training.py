@@ -40,7 +40,7 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
     x_hat_feed = model_spec['x_hat_placeholder']
     rec_output = model_spec['rec_placeholder']
     # Load the training dataset into the pipeline and initialize the metrics local variables
-    sess.run(model_spec['iterator_init_op'])
+    # sess.run(model_spec['iterator_init_op'])
     sess.run(model_spec['metrics_init_op'])
 
 
@@ -69,6 +69,8 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
             writer.add_summary(summ, global_step_val)
             plt.imshow(np.squeeze(x_hat))
             plt.show()
+            plt.imshow(np.squeeze(x_hat+residuals))
+            plt.show()
         else:
             _, _, _ = sess.run([com_train_op, rec_train_op, update_metrics])
             # _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
@@ -79,10 +81,10 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
     metrics_values = {k: v[0] for k, v in metrics.items()}
     metrics_val = sess.run(metrics_values)
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_val.items())
-    logging.info("- Train metrics: " + metrics_string)
+    logging.info("- Train: " + metrics_string)
 
 
-def train_and_evaluate(data, train_model_spec, eval_model_spec, model_dir, params, restore_from=None):
+def train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec, model_dir, params, restore_from=None):
     """Train the model and evaluate every epoch.
 
     Args:
@@ -114,25 +116,25 @@ def train_and_evaluate(data, train_model_spec, eval_model_spec, model_dir, param
         train_writer = tf.summary.FileWriter(os.path.join(model_dir, 'train_summaries'), sess.graph)
         eval_writer = tf.summary.FileWriter(os.path.join(model_dir, 'eval_summaries'), sess.graph)
 
-        best_eval_acc = 0.0
+        best_eval_error = float("inf")
         for epoch in range(begin_at_epoch, begin_at_epoch + params.num_epochs):
             # Run one epoch
             logging.info("Epoch {}/{}".format(epoch + 1, begin_at_epoch + params.num_epochs))
             # Compute number of batches in one epoch (one full pass over the training set)
             num_steps = (params.train_size + params.batch_size - 1) // params.batch_size
-            train_sess(data, sess, train_model_spec, num_steps, train_writer, params)
+            train_sess(train_data, sess, train_model_spec, num_steps, train_writer, params)
 
             # Save weights
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
             last_saver.save(sess, last_save_path, global_step=epoch + 1)
             # Evaluate for one epoch on validation set
             num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
-            metrics = evaluate_sess(sess, eval_model_spec, num_steps, eval_writer)
+            metrics = evaluate_sess(eval_data, sess, eval_model_spec, num_steps, eval_writer)
             # If best_eval, best_save_path
-            eval_acc = metrics['rmse']
-            if eval_acc >= best_eval_acc:
+            eval_error = metrics['rmse']
+            if eval_error <= best_eval_error:
                 # Store new best accuracy
-                best_eval_acc = eval_acc
+                best_eval_error = eval_error
                 # Save weights
                 best_save_path = os.path.join(model_dir, 'best_weights', 'after-epoch')
                 best_save_path = best_saver.save(sess, best_save_path, global_step=epoch + 1)

@@ -78,7 +78,7 @@ def get_rec_input(compact, params):
     return rec_input
 
 
-def model_fn(mode, inputs, params, reuse=False):
+def model_fn(mode, params, reuse=False):
     """Model function defining the graph operations.
 
     Args:
@@ -142,7 +142,8 @@ def model_fn(mode, inputs, params, reuse=False):
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
             'rec_loss': tf.metrics.mean(rec_loss),
-            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=final_output)
+            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=compress+rec_output)
+            # TODO: replace with MMSSIM
         }
 
     # Group the update ops for the tf.metrics

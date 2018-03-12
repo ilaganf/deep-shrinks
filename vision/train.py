@@ -67,7 +67,9 @@ if __name__ == '__main__':
     # eval_inputs = input_fn(False, eval_filenames, params)
 
     # Load image data
-    data = model.input_fn.load_data(params, train_filenames)
+    train_data = model.input_fn.load_data(params, train_filenames)
+    # eval_data = model.input_fn.load_data(params, eval_filenames)
+    eval_data = train_data
 
     # Define the model
     logging.info("Creating the model...")
@@ -76,4 +78,4 @@ if __name__ == '__main__':
 
     # Train the model
     logging.info("Starting training for {} epoch(s)".format(params.num_epochs))
-    train_and_evaluate(data, train_model_spec, eval_model_spec, args.model_dir, params, args.restore_from)
+    train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec, args.model_dir, params, args.restore_from)
