@@ -11,6 +11,7 @@ import numpy as np
 from model.utils import save_dict_to_json
 from model.evaluation import evaluate_sess
 import matplotlib.pyplot as plt
+from model.msssim import MultiScaleSSIM
 
 
 def train_sess(data, sess, model_spec, num_steps, writer, params):
@@ -63,6 +64,7 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
                                                   feed_dict={x_hat_feed:x_hat, labels:batch})
             _, com_loss_val, com_output = sess.run([com_train_op, com_loss, com], 
                                                    feed_dict={rec_output:residuals, labels:batch})
+
             summ, _ = sess.run([summary_op, update_metrics],
                                feed_dict={labels:batch, x_hat_feed:x_hat, rec_output:residuals})
 
@@ -82,6 +84,7 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
     metrics_val = sess.run(metrics_values)
     metrics_string = " ; ".join("{}: {:05.3f}".format(k, v) for k, v in metrics_val.items())
     logging.info("- Train: " + metrics_string)
+    return batch, x_hat+residuals
 
 
 def train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec, model_dir, params, restore_from=None):
@@ -116,25 +119,29 @@ def train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec,
         train_writer = tf.summary.FileWriter(os.path.join(model_dir, 'train_summaries'), sess.graph)
         eval_writer = tf.summary.FileWriter(os.path.join(model_dir, 'eval_summaries'), sess.graph)
 
-        best_eval_error = float("inf")
+        best_eval_msssim = 0.0
         for epoch in range(begin_at_epoch, begin_at_epoch + params.num_epochs):
             # Run one epoch
             logging.info("Epoch {}/{}".format(epoch + 1, begin_at_epoch + params.num_epochs))
             # Compute number of batches in one epoch (one full pass over the training set)
             num_steps = (params.train_size + params.batch_size - 1) // params.batch_size
-            train_sess(train_data, sess, train_model_spec, num_steps, train_writer, params)
+            orig_train_img, result_train_img = train_sess(train_data, sess, train_model_spec, num_steps, train_writer, params)
+            train_msssim = MultiScaleSSIM(orig_train_img, result_train_img)
+            logging.info("Train MS-SSIM: {}".format(train_msssim))
 
             # Save weights
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
             last_saver.save(sess, last_save_path, global_step=epoch + 1)
             # Evaluate for one epoch on validation set
             num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
-            metrics = evaluate_sess(eval_data, sess, eval_model_spec, num_steps, eval_writer)
+            metrics, orig_eval_img, result_eval_img = evaluate_sess(eval_data, sess, eval_model_spec, num_steps, eval_writer)
+            eval_msssim = MultiScaleSSIM(orig_eval_img, result_eval_img)
+            logging.info("Eval MS-SSIM: {}".format(eval_msssim))
             # If best_eval, best_save_path
-            eval_error = metrics['rmse']
-            if eval_error <= best_eval_error:
+            cur_eval_msssim = eval_msssim
+            if cur_eval_msssim >= best_eval_msssim:
                 # Store new best accuracy
-                best_eval_error = eval_error
+                best_eval_msssim = cur_eval_msssim
                 # Save weights
                 best_save_path = os.path.join(model_dir, 'best_weights', 'after-epoch')
                 best_save_path = best_saver.save(sess, best_save_path, global_step=epoch + 1)
