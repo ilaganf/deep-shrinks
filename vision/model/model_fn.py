@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
-from skimage.measure import compare_ssim as ssim
+from model.msssim import MultiScaleSSIM
 '''
 ARCHITECTURE (Jiang et al.)
 c = number of channels (3 for RGB)
@@ -54,7 +54,7 @@ def recCNN(inputs, params, num_channels, num_filters, is_training):
         for i in range(num_intermediate):
             with tf.variable_scope('RecCNN_block_{}'.format(i+2)):
                 out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same', activation=None)
-                # out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
+                out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
                 out = tf.nn.relu(out)
         with tf.variable_scope('RecCNN_output_block'):
             out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
@@ -76,6 +76,7 @@ def get_rec_input(compact, params):
                                 method=tf.image.ResizeMethod.BICUBIC)
     rec_input = tf.cast(up, tf.float32)
     return rec_input
+
 
 
 def model_fn(mode, params, reuse=False):
@@ -143,8 +144,7 @@ def model_fn(mode, params, reuse=False):
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
             'rec_loss': tf.metrics.mean(rec_loss),
-            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=compress+rec_output),
-            #'ssim': ssim(orig_ssim, compress_ssim+rec_output_ssim, multichannel=True)
+            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=compress+rec_output)
         }
 
     # Group the update ops for the tf.metrics
@@ -157,7 +157,6 @@ def model_fn(mode, params, reuse=False):
     # Summaries for training
     tf.summary.scalar('com_loss', com_loss)
     tf.summary.scalar('rec_loss', rec_loss)
-    #tf.summary.scalar('MMSSIM', metrics[ssim]) 
     tf.summary.image('train_image', labels)
 
     #TODO: if mode == 'eval': ?

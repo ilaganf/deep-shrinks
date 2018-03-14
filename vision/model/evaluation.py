@@ -59,7 +59,7 @@ def evaluate_sess(data, sess, model_spec, num_steps, writer=None, params=None):
             summ = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=val)])
             writer.add_summary(summ, global_step_val)
 
-    return metrics_val
+    return metrics_val, batch, x+residuals
 
 
 def evaluate(model_spec, model_dir, params, restore_from):
