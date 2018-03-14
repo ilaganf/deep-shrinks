@@ -58,20 +58,19 @@ if __name__ == '__main__':
     eval_filenames = [os.path.join(eval_data_dir, f) for f in os.listdir(eval_data_dir)
                        if f.endswith('.jpg')]
 
-    # Labels will be between 0 and 5 included (6 classes in total)
 
     # Specify the sizes of the dataset we train on and evaluate on
     params.train_size = len(train_filenames)
-    params.eval_size = len(eval_filenames)
+    params.eval_size = 50 #len(eval_filenames)
 
     # Create the two iterators over the two datasets
     # train_inputs = input_fn(True, train_filenames, params)
     # eval_inputs = input_fn(False, eval_filenames, params)
 
     # Load image data
-    train_data = model.input_fn.load_data(params, train_filenames)
-    # eval_data = model.input_fn.load_data(params, eval_filenames)
-    eval_data = model.input_fn.load_data(params, eval_filenames)
+    train_data = model.input_fn.load_data('data/train_images')
+    eval_data = model.input_fn.load_data('data/eval_images')
+
 
     # Define the model
     logging.info("Creating the model...")

@@ -1,14 +1,11 @@
 """Create the input data pipeline using `tf.data`"""
+import pickle
 
 import tensorflow as tf
 
-
-def load_data(params, filenames):
-    parse_fn = lambda f: _parse_function(f, params.image_size)
-    images = tf.constant(filenames)
-    processed = tf.map_fn(parse_fn, images, dtype=tf.float32)
-    with tf.Session() as sess:
-        data = sess.run(processed)
+def load_data(filename):
+    with open(filename, "rb") as file:
+        data = pickle.load(file)
     return data
 
 def _parse_function(filename, size=180):
