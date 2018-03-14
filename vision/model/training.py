@@ -60,21 +60,21 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
         if i % params.save_summary_steps == 0:
             # Perform a mini-batch update
             x_hat, global_step_val = sess.run([compress, global_step], feed_dict={labels:batch})
-            _, rec_loss_val, residuals = sess.run([rec_train_op, rec_loss, rec], 
+            _, rec_loss_val, residuals = sess.run([rec_train_op, rec_loss, rec],
                                                   feed_dict={x_hat_feed:x_hat, labels:batch})
-            _, com_loss_val, com_output = sess.run([com_train_op, com_loss, com], 
+            _, com_loss_val, com_output = sess.run([com_train_op, com_loss, com],
                                                    feed_dict={rec_output:residuals, labels:batch})
 
             summ, _ = sess.run([summary_op, update_metrics],
                                feed_dict={labels:batch, x_hat_feed:x_hat, rec_output:residuals})
 
             writer.add_summary(summ, global_step_val)
-            plt.imshow(np.squeeze(x_hat))
-            plt.show()
-            plt.imshow(np.squeeze(x_hat+residuals))
-            plt.show()
         else:
-            _, _, _ = sess.run([com_train_op, rec_train_op, update_metrics])
+            x_hat, global_step_val = sess.run([compress, global_step], feed_dict={labels:batch})
+            _, rec_loss_val, residuals = sess.run([rec_train_op, rec_loss, rec],
+                                                  feed_dict={x_hat_feed:x_hat, labels:batch})
+            _, com_loss_val, com_output = sess.run([com_train_op, com_loss, com],
+                                                   feed_dict={rec_output:residuals, labels:batch})
             # _, _, rec_loss_val = sess.run([rec_train_op, update_metrics, rec_loss])
         # Log the loss in the tqdm progress bar
         # t.set_postfix(loss='{:05.3f}'.format(com_loss_val))
@@ -133,23 +133,24 @@ def train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec,
             last_save_path = os.path.join(model_dir, 'last_weights', 'after-epoch')
             last_saver.save(sess, last_save_path, global_step=epoch + 1)
             # Evaluate for one epoch on validation set
-            num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
-            metrics, orig_eval_img, result_eval_img = evaluate_sess(eval_data, sess, eval_model_spec, num_steps, eval_writer)
-            eval_msssim = MultiScaleSSIM(orig_eval_img, result_eval_img)
-            logging.info("Eval MS-SSIM: {}".format(eval_msssim))
-            # If best_eval, best_save_path
-            cur_eval_msssim = eval_msssim
-            if cur_eval_msssim >= best_eval_msssim:
-                # Store new best accuracy
-                best_eval_msssim = cur_eval_msssim
-                # Save weights
-                best_save_path = os.path.join(model_dir, 'best_weights', 'after-epoch')
-                best_save_path = best_saver.save(sess, best_save_path, global_step=epoch + 1)
-                logging.info("- Found new best accuracy, saving in {}".format(best_save_path))
-                # Save best eval metrics in a json file in the model directory
-                best_json_path = os.path.join(model_dir, "metrics_eval_best_weights.json")
-                save_dict_to_json(metrics, best_json_path)
+            if epoch % params.save_summary_steps == 0:
+                num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
+                metrics, orig_eval_img, result_eval_img = evaluate_sess(eval_data, sess, eval_model_spec, num_steps, eval_writer)
+                eval_msssim = MultiScaleSSIM(orig_eval_img, result_eval_img)
+                logging.info("Eval MS-SSIM: {}".format(eval_msssim))
+                # If best_eval, best_save_path
+                cur_eval_msssim = eval_msssim
+                if cur_eval_msssim >= best_eval_msssim:
+                    # Store new best accuracy
+                    best_eval_msssim = cur_eval_msssim
+                    # Save weights
+                    best_save_path = os.path.join(model_dir, 'best_weights', 'after-epoch')
+                    best_save_path = best_saver.save(sess, best_save_path, global_step=epoch + 1)
+                    logging.info("- Found new best accuracy, saving in {}".format(best_save_path))
+                    # Save best eval metrics in a json file in the model directory
+                    best_json_path = os.path.join(model_dir, "metrics_eval_best_weights.json")
+                    save_dict_to_json(metrics, best_json_path)
 
-            # Save latest eval metrics in a json file in the model directory
-            last_json_path = os.path.join(model_dir, "metrics_eval_last_weights.json")
-            save_dict_to_json(metrics, last_json_path)
+                # Save latest eval metrics in a json file in the model directory
+                last_json_path = os.path.join(model_dir, "metrics_eval_last_weights.json")
+                save_dict_to_json(metrics, last_json_path)
