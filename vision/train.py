@@ -20,7 +20,7 @@ from model.training import train_and_evaluate
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/base_model',
                     help="Experiment directory containing params.json")
-parser.add_argument('--data_dir', default='data/train_first_images',
+parser.add_argument('--data_dir', default='data/training_one_example',
                     help="Directory containing the dataset")
 parser.add_argument('--restore_from', default=None,
                     help="Optional, directory or file containing weights to reload before training")
@@ -49,12 +49,14 @@ if __name__ == '__main__':
     logging.info("Creating the datasets...")
     data_dir = args.data_dir
     train_data_dir = data_dir
+    eval_data_dir = data_dir ###CHANGE BACK
     # dev_data_dir = os.path.join(data_dir, "dev_signs")
 
     # Get the filenames from the train and dev sets
     train_filenames = [os.path.join(train_data_dir, f) for f in os.listdir(train_data_dir)
                        if f.endswith('.jpg')]
-    eval_filenames = train_filenames
+    eval_filenames = [os.path.join(eval_data_dir, f) for f in os.listdir(eval_data_dir)
+                       if f.endswith('.jpg')]
 
 
     # Specify the sizes of the dataset we train on and evaluate on
@@ -68,6 +70,7 @@ if __name__ == '__main__':
     # Load image data
     train_data = model.input_fn.load_data('data/train_images')
     eval_data = model.input_fn.load_data('data/eval_images')
+
 
     # Define the model
     logging.info("Creating the model...")

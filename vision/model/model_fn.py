@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 import numpy as np
-
+from skimage.measure import compare_ssim as ssim
 '''
 ARCHITECTURE (Jiang et al.)
 c = number of channels (3 for RGB)
@@ -71,7 +71,7 @@ def get_rec_input(compact, params):
     compact = tf.image.convert_image_dtype(compact, tf.uint8, saturate=True)
     encode_decode = []
     encoded = tf.map_fn(lambda x: tf.image.encode_jpeg(x), compact, dtype=tf.string)
-    decoded = tf.map_fn(lambda x: tf.image.decode_jpeg(x), encoded, dtype=tf.uint8)
+    decoded = tf.map_fn(lambda x: tf.image.decode_jpeg(x, channels=3), encoded, dtype=tf.uint8)
     up = tf.image.resize_images(decoded, (params.image_size, params.image_size),
                                 method=tf.image.ResizeMethod.BICUBIC)
     rec_input = tf.cast(up, tf.float32)
@@ -139,11 +139,12 @@ def model_fn(mode, params, reuse=False):
     # Metrics for evaluation
     # TODO: define metric for recCNN (MMSSIM)
     with tf.variable_scope("metrics"):
+
         metrics = {
             'com_loss': tf.metrics.mean(com_loss),
             'rec_loss': tf.metrics.mean(rec_loss),
-            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=compress+rec_output)
-            # TODO: replace with MMSSIM
+            'rmse': tf.metrics.root_mean_squared_error(labels=labels, predictions=compress+rec_output),
+            #'ssim': ssim(orig_ssim, compress_ssim+rec_output_ssim, multichannel=True)
         }
 
     # Group the update ops for the tf.metrics
@@ -156,7 +157,7 @@ def model_fn(mode, params, reuse=False):
     # Summaries for training
     tf.summary.scalar('com_loss', com_loss)
     tf.summary.scalar('rec_loss', rec_loss)
-    # tf.summary.scalar('MMSSIM', 0) TODO
+    #tf.summary.scalar('MMSSIM', metrics[ssim]) 
     tf.summary.image('train_image', labels)
 
     #TODO: if mode == 'eval': ?
