@@ -46,22 +46,21 @@ if __name__ == '__main__':
     set_logger(os.path.join(args.model_dir, 'train.log'))
 
     # Create the input data pipeline
-    logging.info("Creating the datasets...")
-    data_dir = args.data_dir
-    train_data_dir = data_dir
-    eval_data_dir = data_dir ###CHANGE BACK
-    # dev_data_dir = os.path.join(data_dir, "dev_signs")
-
-    # Get the filenames from the train and dev sets
-    train_filenames = [os.path.join(train_data_dir, f) for f in os.listdir(train_data_dir)
-                       if f.endswith('.jpg')]
-    eval_filenames = [os.path.join(eval_data_dir, f) for f in os.listdir(eval_data_dir)
-                       if f.endswith('.jpg')]
+    # logging.info("Creating the datasets...")
+    # data_dir = args.data_dir
+    # train_data_dir = data_dir
+    # eval_data_dir = data_dir ###CHANGE BACK
+    # # dev_data_dir = os.path.join(data_dir, "dev_signs")
+    #
+    # # Get the filenames from the train and dev sets
+    # train_filenames = [os.path.join(train_data_dir, f) for f in os.listdir(train_data_dir)
+    #                    if f.endswith('.jpg')]
+    # eval_filenames = [os.path.join(eval_data_dir, f) for f in os.listdir(eval_data_dir)
+    #                    if f.endswith('.jpg')]
 
 
     # Specify the sizes of the dataset we train on and evaluate on
-    params.train_size = len(train_filenames)
-    params.eval_size = 50 #len(eval_filenames)
+
 
     # Create the two iterators over the two datasets
     # train_inputs = input_fn(True, train_filenames, params)
@@ -71,6 +70,8 @@ if __name__ == '__main__':
     train_data = model.input_fn.load_data('data/train_images')
     eval_data = model.input_fn.load_data('data/eval_images')
 
+    params.train_size = len(train_data)
+    params.eval_size = len(eval_data)
 
     # Define the model
     logging.info("Creating the model...")
