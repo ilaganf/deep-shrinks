@@ -7,13 +7,13 @@ Assumes a folder called train/ and a folder called eval/ within the working dire
 '''
 
 import pickle
-import os 
+import os
 
 import numpy as np
 import tensorflow as tf
 
-TRAIN_PATH = './training_reduced'
-EVAL_PATH = './evaluation_reduced'
+TRAIN_PATH = './training_one_example'
+EVAL_PATH = './training_one_example'
 
 def main():
     train_filenames = [os.path.join(TRAIN_PATH, f) for f in os.listdir(TRAIN_PATH)

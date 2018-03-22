@@ -5,9 +5,10 @@ import os
 
 from tqdm import trange
 import tensorflow as tf
-
+import matplotlib.pyplot as plt
+import numpy as np
 from model.utils import save_dict_to_json
-
+from model.msssim import MultiScaleSSIM
 
 def evaluate_sess(data, sess, model_spec, num_steps, writer=None, params=None):
     """Train the model on `num_steps` batches.
@@ -45,7 +46,8 @@ def evaluate_sess(data, sess, model_spec, num_steps, writer=None, params=None):
         x = sess.run(compress, feed_dict={labels:batch})
         residuals = sess.run(rec, feed_dict={labels:batch, x_hat:x})
         sess.run(update_metrics, feed_dict={labels:batch, x_hat:x, rec_output:residuals})
-
+        plt.imshow(np.squeeze(x+batch))
+        plt.show()
     # Get the values of the metrics
     metrics_values = {k: v[0] for k, v in eval_metrics.items()}
     metrics_val = sess.run(metrics_values)
@@ -58,11 +60,10 @@ def evaluate_sess(data, sess, model_spec, num_steps, writer=None, params=None):
         for tag, val in metrics_val.items():
             summ = tf.Summary(value=[tf.Summary.Value(tag=tag, simple_value=val)])
             writer.add_summary(summ, global_step_val)
-
     return metrics_val, batch, x+residuals
 
 
-def evaluate(model_spec, model_dir, params, restore_from):
+def evaluate(model_spec, inputs, model_dir, params, restore_from):
     """Evaluate the model
 
     Args:
@@ -87,7 +88,7 @@ def evaluate(model_spec, model_dir, params, restore_from):
 
         # Evaluate
         num_steps = (params.eval_size + params.batch_size - 1) // params.batch_size
-        metrics = evaluate_sess(sess, model_spec, num_steps)
+        metrics = evaluate_sess(inputs, sess, model_spec, num_steps)
         metrics_name = '_'.join(restore_from.split('/'))
         save_path = os.path.join(model_dir, "metrics_test_{}.json".format(metrics_name))
         save_dict_to_json(metrics, save_path)

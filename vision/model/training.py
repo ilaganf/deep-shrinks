@@ -69,6 +69,8 @@ def train_sess(data, sess, model_spec, num_steps, writer, params):
                                feed_dict={labels:batch, x_hat_feed:x_hat, rec_output:residuals})
 
             writer.add_summary(summ, global_step_val)
+            plt.imshow(np.squeeze(com_output))
+            plt.show()
         else:
             x_hat, global_step_val = sess.run([compress, global_step], feed_dict={labels:batch})
             _, rec_loss_val, residuals = sess.run([rec_train_op, rec_loss, rec],
@@ -126,6 +128,7 @@ def train_and_evaluate(train_data, eval_data, train_model_spec, eval_model_spec,
             # Compute number of batches in one epoch (one full pass over the training set)
             num_steps = (params.train_size + params.batch_size - 1) // params.batch_size
             orig_train_img, result_train_img = train_sess(train_data, sess, train_model_spec, num_steps, train_writer, params)
+            
             train_msssim = MultiScaleSSIM(orig_train_img, result_train_img)
             logging.info("Train MS-SSIM: {}".format(train_msssim))
 

@@ -6,6 +6,7 @@ import os
 
 import tensorflow as tf
 
+import model.input_fn
 from model.input_fn import input_fn
 from model.model_fn import model_fn
 from model.evaluation import evaluate
@@ -14,11 +15,11 @@ from model.utils import set_logger
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_dir', default='experiments/test',
+parser.add_argument('--model_dir', default='experiments/base_model',
                     help="Experiment directory containing params.json")
-parser.add_argument('--data_dir', default='data/64x64_SIGNS',
+parser.add_argument('--data_dir', default='data/training_one_example',
                     help="Directory containing the dataset")
-parser.add_argument('--restore_from', default='best_weights',
+parser.add_argument('--restore_from', default='last_weights',
                     help="Subdirectory of model dir or file containing the weights")
 
 
@@ -37,24 +38,22 @@ if __name__ == '__main__':
 
     # Create the input data pipeline
     logging.info("Creating the dataset...")
-    data_dir = args.data_dir
-    test_data_dir = os.path.join(data_dir, "test_signs")
+    test_data_dir = args.data_dir
 
     # Get the filenames from the test set
     test_filenames = os.listdir(test_data_dir)
     test_filenames = [os.path.join(test_data_dir, f) for f in test_filenames if f.endswith('.jpg')]
 
-    test_labels = [int(f.split('/')[-1][0]) for f in test_filenames]
 
     # specify the size of the evaluation set
     params.eval_size = len(test_filenames)
 
     # create the iterator over the dataset
-    test_inputs = input_fn(False, test_filenames, test_labels, params)
+    test_inputs = model.input_fn.load_data('data/eval_images')
 
     # Define the model
     logging.info("Creating the model...")
-    model_spec = model_fn('eval', test_inputs, params, reuse=False)
-
+    model_spec = model_fn('eval', params, reuse=False)
+    print(type(test_inputs))
     logging.info("Starting evaluation")
-    evaluate(model_spec, args.model_dir, params, args.restore_from)
+    evaluate(model_spec, test_inputs, args.model_dir, params, args.restore_from)

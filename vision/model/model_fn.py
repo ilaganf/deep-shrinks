@@ -24,13 +24,13 @@ def comCNN(inputs, params, num_channels, num_filters):
     with tf.variable_scope('ComCNN_vars'):
         with tf.variable_scope('ComCNN_block_1'):
             # TODO: possibly add regularization
-            out = tf.layers.conv2d(inputs=out, filters=num_filters, 
+            out = tf.layers.conv2d(inputs=out, filters=num_filters,
                                    kernel_size=3, strides=1, padding='same')
             out = tf.nn.relu(out)
         with tf.variable_scope('ComCNN_block_2'):
             out = tf.layers.conv2d(out, num_filters, 3, 2, padding='same')
             out = tf.nn.relu(out)
-        with tf.variable_scope('ComCNN_output_block'): 
+        with tf.variable_scope('ComCNN_output_block'):
             # for generating compact representation of image
             out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
 
@@ -54,7 +54,7 @@ def recCNN(inputs, params, num_channels, num_filters, is_training):
         for i in range(num_intermediate):
             with tf.variable_scope('RecCNN_block_{}'.format(i+2)):
                 out = tf.layers.conv2d(out, num_filters, 3, 1, padding='same', activation=None)
-                out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
+                # out = tf.layers.batch_normalization(out, momentum=bn_momentum, training=is_training)
                 out = tf.nn.relu(out)
         with tf.variable_scope('RecCNN_output_block'):
             out = tf.layers.conv2d(out, num_channels, 3, 1, padding='same')
@@ -96,7 +96,7 @@ def model_fn(mode, params, reuse=False):
     num_channels = params.num_channels
     num_filters = 64
     # labels = inputs['images'] # we train based on similarity to original image
-    labels = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels], 
+    labels = tf.placeholder(tf.float32, shape=[None, params.image_size, params.image_size, num_channels],
                             name='input_images')
     # -----------------------------------------------------------
     # MODEL: define the layers of the model
@@ -111,7 +111,7 @@ def model_fn(mode, params, reuse=False):
                                     name="rec_output")
         com_direct = tf.image.resize_images(com, (params.image_size, params.image_size),
                                           method=tf.image.ResizeMethod.BICUBIC)
-    
+
     final_output = rec_output + com_direct
     # Define loss for both networks
     com_loss = .5 * tf.losses.mean_squared_error(labels=labels, predictions=final_output)
@@ -127,11 +127,11 @@ def model_fn(mode, params, reuse=False):
         #     with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
         #         train_op = optimizer.minimize(loss, global_step=global_step)
         # else:
-        train_op1 = optimizer.minimize(com_loss, global_step=global_step, 
-                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 
+        train_op1 = optimizer.minimize(com_loss, global_step=global_step,
+                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                                                   scope='model/ComCNN_vars'))
-        train_op2 = optimizer.minimize(rec_loss, global_step=global_step, 
-                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 
+        train_op2 = optimizer.minimize(rec_loss, global_step=global_step,
+                                       var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES,
                                                                   scope='model/RecCNN_vars'))
 
 
